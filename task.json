@@ -1,0 +1,73 @@
+[
+  {
+    "id": 1,
+    "category": "setup",
+    "description": "Initialize project structure and dependencies",
+    "steps": [
+      "Check current project files",
+      "Install required dependencies",
+      "Verify project can run"
+    ],
+    "passes": false
+  },
+  {
+    "id": 2,
+    "category": "functional",
+    "description": "Implement user authentication (register/login)",
+    "steps": [
+      "Create user model",
+      "Implement registration endpoint",
+      "Implement login endpoint",
+      "Test authentication flow"
+    ],
+    "passes": false
+  },
+  {
+    "id": 3,
+    "category": "functional",
+    "description": "Implement video generation pipeline",
+    "steps": [
+      "Create LLM integration for text generation",
+      "Implement image generation for storyboards",
+      "Implement video generation from images",
+      "Create pipeline orchestration"
+    ],
+    "passes": false
+  },
+  {
+    "id": 4,
+    "category": "functional",
+    "description": "Add database integration with Supabase",
+    "steps": [
+      "Set up Supabase client",
+      "Create database schema",
+      "Implement CRUD operations",
+      "Test database connectivity"
+    ],
+    "passes": false
+  },
+  {
+    "id": 5,
+    "category": "functional",
+    "description": "Build responsive UI",
+    "steps": [
+      "Create desktop layout",
+      "Create mobile layout",
+      "Add responsive breakpoints",
+      "Test on both viewports"
+    ],
+    "passes": false
+  },
+  {
+    "id": 6,
+    "category": "testing",
+    "description": "End-to-end testing and bug fixing",
+    "steps": [
+      "Run full pipeline test",
+      "Identify any errors",
+      "Fix bugs found",
+      "Verify all features work"
+    ],
+    "passes": false
+  }
+]

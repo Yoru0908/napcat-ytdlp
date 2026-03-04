@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Video Bot 主应用
+  video-bot:
+    build: .
+    container_name: video-bot
+    ports:
+      - "${FLASK_PORT:-5000}:5000"
+    volumes:
+      - ./app:/app
+      - ${DOWNLOAD_DIR:-/tmp/alist_downloads}:/downloads
+      - ./data:/app/data
+    environment:
+      - FLASK_HOST=${FLASK_HOST:-0.0.0.0}
+      - FLASK_PORT=${FLASK_PORT:-5000}
+      - DOWNLOAD_DIR=/downloads
+      - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-2}
+      - NAPCAT_WS_URL=ws://napcat:${NAPCAT_WS_PORT:-3001}
+      - NAPCAT_HTTP_URL=http://napcat:${NAPCAT_HTTP_PORT:-3000}
+      - NAPCAT_TOKEN=${NAPCAT_TOKEN}
+      - MASTER_QQ=${MASTER_QQ}
+      - ALIST_URL=http://alist:${ALIST_PORT:-5244}
+      - ALIST_USERNAME=${ALIST_USERNAME:-admin}
+      - ALIST_PASSWORD=${ALIST_PASSWORD}
+      - ALIST_PUBLIC_URL=${ALIST_PUBLIC_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_API_URL=${LLM_API_URL}
+      - LLM_MODEL=${LLM_MODEL}
+    depends_on:
+      - napcat
+      - alist
+    restart: unless-stopped
+
+  # Napcat QQ 机器人
+  napcat:
+    image: mlikowa/napcat-docker:latest
+    container_name: napcat
+    ports:
+      - "${NAPCAT_WEBUI_PORT:-6099}:6099"
+      - "${NAPCAT_HTTP_PORT:-3000}:3000"
+      - "${NAPCAT_WS_PORT:-3001}:3001"
+    volumes:
+      - ./data/napcat:/app/napcat/config
+    environment:
+      - NAPCAT_ACCOUNTQQ=${NAPCAT_ACCOUNTQQ}
+    restart: unless-stopped
+
+  # Alist 网盘
+  alist:
+    image: xhofe/alist:latest
+    container_name: alist
+    ports:
+      - "${ALIST_PORT:-5244}:5244"
+    volumes:
+      - ./data/alist:/opt/alist/data
+      - ${DOWNLOAD_DIR:-/tmp/alist_downloads}:/downloads
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=022
+    restart: unless-stopped
+
+  # 可选：Redis 缓存 (如果需要)
+  # redis:
+  #   image: redis:alpine
+  #   container_name: video-bot-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - ./data/redis:/data
+  #   restart: unless-stopped
+
+networks:
+  default:
+    name: napcat-video-bot

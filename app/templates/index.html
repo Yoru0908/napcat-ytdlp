@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频管理控制台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root {
+            --pico-font-size: 14px;
+            --pico-border-radius: 4px;
+        }
+
+        /* 状态颜色 */
+        .status-pending { color: #f59e0b; }
+        .status-running { color: #3b82f6; }
+        .status-completed { color: #10b981; }
+        .status-failed { color: #ef4444; }
+        .status-stopped { color: #6b7280; }
+
+        /* 进度条 */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: #3b82f6;
+            transition: width 0.3s ease;
+        }
+
+        /* 表格样式 */
+        .task-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .task-table th,
+        .task-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .task-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        /* 操作按钮 */
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* 表单卡片 */
+        .form-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        /* 日志区域 */
+        #log-content {
+            font-family: monospace;
+            font-size: 12px;
+            background: #1f2937;
+            color: #10b981;
+            padding: 12px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .task-table th:nth-child(3),
+            .task-table td:nth-child(3) {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>视频管理控制台</h1>
+
+        <!-- 新建任务表单 -->
+        <section class="form-card">
+            <h3>新建任务</h3>
+            <form id="task-form">
+                <div class="grid">
+                    <select id="action" required>
+                        <option value="download">下载视频</option>
+                        <option value="record">录制直播</option>
+                        <option value="transcode">转码</option>
+                        <option value="cut">剪辑片段</option>
+                        <option value="extract_audio">提取音频</option>
+                    </select>
+                    <input type="text" id="url" placeholder="视频/直播链接" required>
+                </div>
+                <div class="grid" id="ffmpeg-options" style="display:none;">
+                    <input type="text" id="input_file" placeholder="输入文件路径">
+                    <input type="text" id="output_file" placeholder="输出文件路径">
+                </div>
+                <button type="submit" class="btn-sm">提交任务</button>
+            </form>
+        </section>
+
+        <!-- 任务列表 -->
+        <section>
+            <h3>任务列表 <button onclick="refreshTasks()" class="secondary btn-sm">刷新</button></h3>
+            <table class="task-table">
+                <thead>
+                    <tr>
+                        <th>任务ID</th>
+                        <th>操作</th>
+                        <th>状态</th>
+                        <th>进度</th>
+                        <th>直链</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="task-list">
+                    <tr><td colspan="6">加载中...</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 日志查看 -->
+        <section>
+            <h3>任务日志</h3>
+            <details>
+                <summary>点击展开日志</summary>
+                <select id="log-task-select">
+                    <option value="">选择任务查看日志</option>
+                </select>
+                <div id="log-content">选择任务后显示日志...</div>
+            </details>
+        </section>
+    </main>
+
+    <script>
+        // 刷新任务列表
+        async function refreshTasks() {
+            const resp = await fetch('/api/tasks');
+            const tasks = await resp.json();
+            const tbody = document.getElementById('task-list');
+            const select = document.getElementById('log-task-select');
+
+            // 清空
+            tbody.innerHTML = '';
+            select.innerHTML = '<option value="">选择任务查看日志</option>';
+
+            tasks.forEach(task => {
+                if (!task.task_id) return;
+
+                // 添加到下拉选择
+                const opt = document.createElement('option');
+                opt.value = task.task_id;
+                opt.textContent = task.task_id.substring(0, 12);
+                select.appendChild(opt);
+
+                // 状态样式
+                const statusClass = `status-${task.status}`;
+                const progress = task.progress || 0;
+
+                // 直链
+                let linkHtml = '-';
+                if (task.alist_url) {
+                    linkHtml = `<a href="${task.alist_url}" target="_blank">下载</a>`;
+                }
+
+                // 操作按钮
+                let actionHtml = '';
+                if (task.status === 'running' || task.status === 'pending') {
+                    actionHtml = `<button onclick="stopTask('${task.task_id}')" class="secondary btn-sm">停止</button>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${task.task_id.substring(0, 12)}</td>
+                    <td>${task.action}</td>
+                    <td class="${statusClass}">${task.status}</td>
+                    <td>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width:${progress}%"></div>
+                        </div>
+                        ${progress}%
+                    </td>
+                    <td>${linkHtml}</td>
+                    <td>${actionHtml}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (tasks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">暂无任务</td></tr>';
+            }
+        }
+
+        // 提交任务
+        document.getElementById('task-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const action = document.getElementById('action').value;
+            const url = document.getElementById('url').value;
+            const input_file = document.getElementById('input_file').value;
+            const output_file = document.getElementById('output_file').value;
+
+            const data = { action };
+            if (['download', 'record'].includes(action)) {
+                data.url = url;
+            } else {
+                data.input_file = input_file;
+                data.output_file = output_file;
+            }
+
+            const resp = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (resp.ok) {
+                const result = await resp.json();
+                alert(`任务已创建: ${result.task_id}`);
+                refreshTasks();
+            } else {
+                alert('创建任务失败');
+            }
+        });
+
+        // 切换表单选项
+        document.getElementById('action').addEventListener('change', (e) => {
+            const isYtdlp = ['download', 'record'].includes(e.target.value);
+            document.getElementById('ffmpeg-options').style.display = isYtdlp ? 'none' : 'grid';
+            document.getElementById('url').required = isYtdlp;
+            document.getElementById('input_file').required = !isYtdlp;
+            document.getElementById('output_file').required = !isYtdlp;
+        });
+
+        // 停止任务
+        async function stopTask(taskId) {
+            if (!confirm('确定要停止这个任务吗？')) return;
+
+            const resp = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+            if (resp.ok) {
+                refreshTasks();
+            } else {
+                alert('停止任务失败');
+            }
+        }
+
+        // 查看日志
+        document.getElementById('log-task-select').addEventListener('change', (e) => {
+            const taskId = e.target.value;
+            if (!taskId) {
+                document.getElementById('log-content').textContent = '选择任务后显示日志...';
+                return;
+            }
+
+            const eventSource = new EventSource(`/api/logs/${taskId}`);
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                document.getElementById('log-content').textContent += data.content;
+                document.getElementById('log-content').scrollTop = document.getElementById('log-content').scrollHeight;
+            };
+            eventSource.onerror = () => {
+                eventSource.close();
+            };
+        });
+
+        // 页面加载后刷新
+        refreshTasks();
+        setInterval(refreshTasks, 5000);
+    </script>
+</body>
+</html>
