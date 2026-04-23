@@ -276,7 +276,7 @@ class NapcatHandler:
         raw_message = data.get('raw_message', '')
 
         # 用 bot_qq 检查是否 @机器人
-        check_qq = self.bot_qq or config.MASTER_QQ
+        check_qq = self.bot_qq or config.BOT_QQ
         is_at_me = any(
             seg.get('type') == 'at' and str(seg.get('data', {}).get('qq', '')) == str(check_qq)
             for seg in message
@@ -284,12 +284,9 @@ class NapcatHandler:
         if not is_at_me:
             return
 
-        # 权限检查
+        # 获取发送者信息
         sender = data.get('sender', {})
         user_id = str(sender.get('user_id', ''))
-        if user_id != config.MASTER_QQ:
-            await self.send_group_reply(data, "抱歉，只有主人可以使用这个功能~")
-            return
 
         text_content = ' '.join(
             seg.get('data', {}).get('text', '')
